@@ -1,5 +1,8 @@
 [![Build Status](https://img.shields.io/endpoint?url=https%3A%2F%2Fci.ocamllabs.io%2Fbadge%2Focaml-ppx%2Focamlformat%2Fmain&logo=ocaml)](https://ci.ocamllabs.io/github/ocaml-ppx/ocamlformat)
 
+It sounds like the main fork wants to remove all of the formatting features that make ocaml code too readable... So this is a fork that will only maintain features, not arbitrarily remove them.
+
+
 # OCamlFormat
 
 Hello, new user! Welcome! :wave:
