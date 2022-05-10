@@ -15,6 +15,7 @@ module Error = struct
     | Malformed of string
     | Misplaced of string * string
     | Unknown of string * [`Msg of string] option
+    | Version_mismatch of {read: string; installed: string}
 
   let to_string = function
     | Malformed line -> Format.sprintf "Invalid format %S" line
@@ -23,6 +24,11 @@ module Error = struct
     | Unknown (name, Some (`Msg msg)) ->
         Format.sprintf "Unknown option %S: %s" name msg
     | Bad_value (name, msg) -> Format.sprintf "For option %S: %s" name msg
+    | Version_mismatch {read; installed} ->
+        Format.sprintf
+          "Project should be formatted using ocamlformat version %S, but \
+           the installed version is %S"
+          read installed
 end
 
 module type CONFIG = sig
@@ -106,13 +112,8 @@ module Make (C : CONFIG) = struct
       (in_attributes allow_inline kind)
       status_doc status
 
-  let generated_doc ?default_doc conv ~allow_inline ~doc ~kind ~default
-      ~status =
-    let default_doc =
-      match default_doc with
-      | Some x -> x
-      | None -> Format.asprintf "%a" (Arg.conv_printer conv) default
-    in
+  let generated_doc conv ~allow_inline ~doc ~kind ~default ~status =
+    let default_doc = Format.asprintf "%a" (Arg.conv_printer conv) default in
     let default =
       if String.is_empty default_doc then "none" else default_doc
     in
@@ -177,13 +178,12 @@ module Make (C : CONFIG) = struct
     store := Pack opt :: !store ;
     opt
 
-  let any ?default_doc converter ~default ~docv ~names ~doc ~kind
+  let any converter ~default ~docv ~names ~doc ~kind
       ?(allow_inline = Poly.(kind = Formatting)) ?(status = `Valid) update
       get_value =
     let open Cmdliner in
     let doc =
-      generated_doc converter ?default_doc ~allow_inline ~doc ~kind ~default
-        ~status
+      generated_doc converter ~allow_inline ~doc ~kind ~default ~status
     in
     let docs = section_name kind status in
     let term =

@@ -33,14 +33,10 @@
   "OCamlFormat is a tool to automatically format OCaml code in a uniform style.")
  (depends
   (ocaml
-   (and
-    (>= 4.08)
-    (< 4.15)))
+   (>= 4.08))
   (alcotest :with-test)
   (base
-   (and
-    (>= v0.12.0)
-    (< v0.15)))
+   (>= v0.12.0))
   (cmdliner
    (>= 1.1.0))
   dune
@@ -65,12 +61,13 @@
    (>= 1.0.0))
   (re
    (>= 1.7.2))
-  (stdio
-   (< v0.15))
+  stdio
   (uuseg
    (>= 10.0.0))
   (uutf
-   (>= 1.0.1))))
+   (>= 1.0.1))
+  (csexp
+   (>= 1.4.0))))
 
 (package
  (name ocamlformat-bench)
@@ -79,9 +76,7 @@
   "OCamlFormat is a tool to automatically format OCaml code in a uniform style.")
  (depends
   (ocaml
-   (and
-    (>= 4.08)
-    (< 4.15)))
+   (>= 4.08))
   (alcotest :with-test)
   (bechamel
    (>= 0.2.0))
@@ -89,25 +84,8 @@
    (>= 0.2.0))
   (ocamlformat
    (= :version))
-  (stdio
-   (< v0.15))
+  stdio
   yojson))
-
-(package
- (name ocamlformat-rpc)
- (synopsis "Auto-formatter for OCaml code (RPC mode)")
- (description
-  "OCamlFormat is a tool to automatically format OCaml code in a uniform style. This package defines a RPC interface to OCamlFormat")
- (depends
-  (ocaml
-   (and
-    (>= 4.08)
-    (< 4.15)))
-  (alcotest :with-test)
-  (ocamlformat
-   (= :version))
-  (ocamlformat-rpc-lib
-   (= :version))))
 
 (package
  (name ocamlformat-rpc-lib)
@@ -117,8 +95,6 @@
  (license MIT)
  (depends
   (ocaml
-   (and
-    (>= 4.08)
-    (< 4.15)))
+   (>= 4.08))
   (csexp
    (>= 1.4.0))))

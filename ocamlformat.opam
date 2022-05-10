@@ -8,9 +8,9 @@ authors: ["Josh Berdine <jjb@fb.com>"]
 homepage: "https://github.com/ocaml-ppx/ocamlformat"
 bug-reports: "https://github.com/ocaml-ppx/ocamlformat/issues"
 depends: [
-  "ocaml" {>= "4.08" & < "4.15"}
+  "ocaml" {>= "4.08"}
   "alcotest" {with-test}
-  "base" {>= "v0.12.0" & < "v0.15"}
+  "base" {>= "v0.12.0"}
   "cmdliner" {>= "1.1.0"}
   "dune" {>= "2.8"}
   "dune" {with-test & < "3.0"}
@@ -25,9 +25,10 @@ depends: [
   "ocp-indent"
   "odoc-parser" {>= "1.0.0"}
   "re" {>= "1.7.2"}
-  "stdio" {< "v0.15"}
+  "stdio"
   "uuseg" {>= "10.0.0"}
   "uutf" {>= "1.0.1"}
+  "csexp" {>= "1.4.0"}
   "odoc" {with-doc}
 ]
 build: [

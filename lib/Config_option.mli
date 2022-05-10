@@ -15,6 +15,7 @@ module Error : sig
     | Malformed of string
     | Misplaced of string * string
     | Unknown of string * [`Msg of string] option
+    | Version_mismatch of {read: string; installed: string}
 
   val to_string : t -> string
 end
@@ -90,11 +91,7 @@ module Make (C : CONFIG) : sig
   val flag : default:bool -> bool option_decl
 
   val any :
-       ?default_doc:string
-    -> 'a Cmdliner.Arg.conv
-    -> default:'a
-    -> docv:string
-    -> 'a option_decl
+    'a Cmdliner.Arg.conv -> default:'a -> docv:string -> 'a option_decl
 
   val removed_option :
     names:string list -> since:Version.t -> msg:string -> unit

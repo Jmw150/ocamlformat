@@ -240,13 +240,22 @@ module Longident = struct
   let fit_margin (c : Conf.t) x = x * 3 < c.fmt_opts.margin * 2
 
   let is_simple c x =
-    let rec length (x : Longident.t) =
+    let rec length (x : t) =
       match x with
       | Lident x -> String.length x
       | Ldot (x, y) -> length x + 1 + String.length y
       | Lapply (x, y) -> length x + length y + 3
     in
     fit_margin c (length x)
+
+  let field_alias_str ~field y =
+    match field with
+    | Ldot (_, x) | Lident x -> String.equal x y
+    | Lapply _ -> false
+
+  let field_alias ~field = function
+    | Lident x -> field_alias_str ~field x
+    | Ldot _ | Lapply _ -> false
 end
 
 module Attr = struct
@@ -752,24 +761,24 @@ module T = struct
     | Rep
 
   let dump fs = function
-    | Pld l -> Format.fprintf fs "Pld:@\n%a" Pprintast.payload l
-    | Typ t -> Format.fprintf fs "Typ:@\n%a" Pprintast.core_type t
-    | Td t -> Format.fprintf fs "Td:@\n%a" Pprintast.type_declaration t
-    | Pat p -> Format.fprintf fs "Pat:@\n%a" Pprintast.pattern p
-    | Exp e -> Format.fprintf fs "Exp:@\n%a" Pprintast.expression e
-    | Vb b -> Format.fprintf fs "Vb:@\n%a" Pprintast.binding b
-    | Cl cl -> Format.fprintf fs "Cl:@\n%a" Pprintast.class_expr cl
-    | Mty mt -> Format.fprintf fs "Mty:@\n%a" Pprintast.module_type mt
-    | Cty cty -> Format.fprintf fs "Cty:@\n%a" Pprintast.class_type cty
-    | Mod m -> Format.fprintf fs "Mod:@\n%a" Pprintast.module_expr m
-    | Sig s -> Format.fprintf fs "Sig:@\n%a" Pprintast.signature_item s
+    | Pld l -> Format.fprintf fs "Pld:@\n%a" Printast.payload l
+    | Typ t -> Format.fprintf fs "Typ:@\n%a" Printast.core_type t
+    | Td t -> Format.fprintf fs "Td:@\n%a" Printast.type_declaration t
+    | Pat p -> Format.fprintf fs "Pat:@\n%a" Printast.pattern p
+    | Exp e -> Format.fprintf fs "Exp:@\n%a" Printast.expression e
+    | Vb b -> Format.fprintf fs "Vb:@\n%a" Printast.value_binding b
+    | Cl cl -> Format.fprintf fs "Cl:@\n%a" Printast.class_expr cl
+    | Mty mt -> Format.fprintf fs "Mty:@\n%a" Printast.module_type mt
+    | Cty cty -> Format.fprintf fs "Cty:@\n%a" Printast.class_type cty
+    | Mod m -> Format.fprintf fs "Mod:@\n%a" Printast.module_expr m
+    | Sig s -> Format.fprintf fs "Sig:@\n%a" Printast.signature_item s
     | Str s | Tli (`Item s) ->
-        Format.fprintf fs "Str:@\n%a" Pprintast.structure_item s
-    | Clf clf -> Format.fprintf fs "Clf:@\n%a@\n" Pprintast.class_field clf
+        Format.fprintf fs "Str:@\n%a" Printast.structure_item s
+    | Clf clf -> Format.fprintf fs "Clf:@\n%a@\n" Printast.class_field clf
     | Ctf ctf ->
-        Format.fprintf fs "Ctf:@\n%a@\n" Pprintast.class_type_field ctf
+        Format.fprintf fs "Ctf:@\n%a@\n" Printast.class_type_field ctf
     | Tli (`Directive d) ->
-        Format.fprintf fs "Dir:@\n%a" Pprintast.toplevel_phrase (Ptop_dir d)
+        Format.fprintf fs "Dir:@\n%a" Printast.top_phrase (Ptop_dir d)
     | Top -> Format.pp_print_string fs "Top"
     | Rep -> Format.pp_print_string fs "Rep"
 end
@@ -1371,7 +1380,8 @@ end = struct
        |Pexp_newtype _ | Pexp_open _ | Pexp_override _ | Pexp_pack _
        |Pexp_poly _ | Pexp_record _ | Pexp_send _ | Pexp_sequence _
        |Pexp_setfield _ | Pexp_setinstvar _ | Pexp_tuple _
-       |Pexp_unreachable | Pexp_variant _ | Pexp_while _ | Pexp_hole ->
+       |Pexp_unreachable | Pexp_variant _ | Pexp_while _ | Pexp_hole
+       |Pexp_beginend _ ->
           assert false
       | Pexp_extension (_, ext) -> assert (check_extensions ext)
       | Pexp_object {pcstr_self; pcstr_fields} ->
@@ -1516,6 +1526,7 @@ end = struct
                          true
                      | _ -> e == e ) )
         | Pexp_assert e
+         |Pexp_beginend e
          |Pexp_constraint (e, _)
          |Pexp_coerce (e, _, _)
          |Pexp_field (e, _)
@@ -2131,7 +2142,7 @@ end = struct
          |Pexp_new _ | Pexp_object _ | Pexp_override _ | Pexp_pack _
          |Pexp_poly _ | Pexp_record _ | Pexp_send _ | Pexp_unreachable
          |Pexp_variant (_, None)
-         |Pexp_hole | Pexp_while _ ->
+         |Pexp_hole | Pexp_while _ | Pexp_beginend _ ->
             false
       in
       Exp.mem_cls cls exp
@@ -2210,7 +2221,7 @@ end = struct
        |Pexp_new _ | Pexp_object _ | Pexp_override _ | Pexp_pack _
        |Pexp_poly _ | Pexp_record _ | Pexp_send _ | Pexp_unreachable
        |Pexp_variant (_, None)
-       |Pexp_hole | Pexp_while _ ->
+       |Pexp_hole | Pexp_while _ | Pexp_beginend _ ->
           false
     in
     Hashtbl.find_or_add marked_parenzed_inner_nested_match exp

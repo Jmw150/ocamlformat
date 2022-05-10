@@ -157,13 +157,14 @@ let info =
          the processed file."
     ; `P
         "(*) $(b,.ocamlformat) files in current and all ancestor \
-         directories for each input file are used, as well as the global \
-         $(b,ocamlformat) file defined in $(b,\\$XDG_CONFIG_HOME) or in \
-         $(b,\\$HOME/.config) if $(b,\\$XDG_CONFIG_HOME) is undefined. The \
-         global $(b,ocamlformat) file has the lowest priority, then the \
-         closer the directory is to the processed file, the higher the \
-         priority. The global $(b,ocamlformat) file is only used when the \
-         option $(b,enable-outside-detected-project) is set."
+         directories for each input file are used, applied from top to \
+         bottom, overriding the settings each time a file is applied, \
+         stopping at the project root. If no project root and no \
+         $(b,ocamlformat) file has been found, and if the option \
+         $(b,enable-outside-detected-project) is set, the global \
+         $(b,ocamlformat) file defined in $(b,\\$XDG_CONFIG_HOME) (or in \
+         $(b,\\$HOME/.config) if $(b,\\$XDG_CONFIG_HOME) is undefined) is \
+         used."
     ; `P
         "If the $(b,disable) option is not set, an $(b,.ocamlformat-ignore) \
          file specifies files that OCamlFormat should ignore. Each line in \
@@ -587,7 +588,7 @@ module Formatting = struct
           "$(b,preserve) preserves the original grouping syntax \
            (parentheses or $(i,begin)/$(i,end))." ]
     in
-    C.choice ~names ~all ~doc ~kind
+    C.choice ~names ~all ~doc ~kind ~allow_inline:false
       (fun conf x -> update conf ~f:(fun f -> {f with exp_grouping= x}))
       (fun conf -> conf.fmt_opts.exp_grouping)
 
@@ -1188,10 +1189,9 @@ module Operational = struct
   let ocaml_version =
     let docv = "V" in
     let doc = "Version of OCaml syntax of the output." in
-    let default = Ocaml_version.sys_version in
-    let default_doc = "the version of OCaml used to build OCamlFormat" in
-    C.any ocaml_version_conv ~names:["ocaml-version"] ~default ~default_doc
-      ~doc ~docv ~kind
+    let default = Ocaml_version.Releases.v4_04_0 in
+    C.any ocaml_version_conv ~names:["ocaml-version"] ~default ~doc ~docv
+      ~kind
       (fun conf x -> update conf ~f:(fun f -> {f with ocaml_version= x}))
       (fun conf -> conf.opr_opts.ocaml_version)
 
@@ -1232,10 +1232,15 @@ let enable_outside_detected_project =
   in
   let doc =
     Format.sprintf
-      "Read $(b,.ocamlformat) config files outside the current project. The \
-       project root of an input file is taken to be the nearest ancestor \
-       directory that contains a %s file. Formatting is enabled even if no \
-       $(b,.ocamlformat) configuration file is found."
+      "Read $(b,.ocamlformat) config files outside the current project when \
+       no project root has been detected for the input file. The project \
+       root of an input file is taken to be the nearest ancestor directory \
+       that contains a %s file. If $(b,.ocamlformat) config files are \
+       located in the same directory or parents they are applied, if no \
+       $(b,.ocamlformat) file is found then the global configuration \
+       defined in $(b,\\$XDG_CONFIG_HOME/.ocamlformat) (or in \
+       $(b,\\$HOME/.config/.ocamlformat) if $(b,\\$XDG_CONFIG_HOME) is \
+       undefined) is applied."
       witness
   in
   let default = false in
@@ -1791,10 +1796,8 @@ let parse_line config ~from s =
           Ok config
         else
           Error
-            (Config_option.Error.Bad_value
-               ( name
-               , Format.sprintf "expecting %S but got %S" Version.current
-                   value ) )
+            (Config_option.Error.Version_mismatch
+               {read= value; installed= Version.current} )
     | name, `File x ->
         C.update ~config ~from:(`Parsed (`File x)) ~name ~value ~inline:false
     | name, `Attribute ->
@@ -2145,7 +2148,7 @@ let validate () =
 
 let action () = parse info validate
 
-open Extended_ast
+open Parsetree
 
 let update ?(quiet = false) c {attr_name= {txt; loc}; attr_payload; _} =
   let result =

@@ -9,7 +9,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Ocaml_413
+open Parser_standard
 open Std_ast
 
 let is_doc = function
@@ -52,7 +52,7 @@ let normalize_code conf (m : Ast_mapper.mapper) txt =
         |> List.iter ~f:(fun {Cmt.txt; _} -> Format.fprintf fmt "%s," txt)
       in
       let ast = m.structure m ast in
-      Format.asprintf "AST,%a,COMMENTS,[%a]" Pprintast.structure ast
+      Format.asprintf "AST,%a,COMMENTS,[%a]" Printast.implementation ast
         print_comments comments
   | exception _ -> txt
 

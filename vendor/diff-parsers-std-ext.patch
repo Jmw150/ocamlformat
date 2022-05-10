@@ -1,5 +1,5 @@
---- ocaml-4.13/ast_helper.ml
-+++ ocaml-4.13-extended/ast_helper.ml
+--- parser-standard/ast_helper.ml
++++ parser-extended/ast_helper.ml
 @@@@
  
  let with_default_loc l f =
@@ -57,8 +57,20 @@
    let while_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_while (a, b))
    let for_ ?loc ?attrs a b c d e = mk ?loc ?attrs (Pexp_for (a, b, c, d, e))
    let constraint_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_constraint (a, b))
---- ocaml-4.13/ast_helper.mli
-+++ ocaml-4.13-extended/ast_helper.mli
+@@@@
+   let letop ?loc ?attrs let_ ands body =
+     mk ?loc ?attrs (Pexp_letop {let_; ands; body})
+   let extension ?loc ?attrs a = mk ?loc ?attrs (Pexp_extension a)
+   let unreachable ?loc ?attrs () = mk ?loc ?attrs Pexp_unreachable
+   let hole  ?loc ?attrs () = mk ?loc ?attrs Pexp_hole
++  let beginend ?loc ?attrs a = mk ?loc ?attrs (Pexp_beginend a)
+ 
+   let case lhs ?guard rhs =
+     {
+      pc_lhs = lhs;
+      pc_guard = guard;
+--- parser-standard/ast_helper.mli
++++ parser-extended/ast_helper.mli
 @@@@
          of the provided function. *)
  
@@ -117,8 +129,20 @@
      val sequence: ?loc:loc -> ?attrs:attrs -> expression -> expression
                    -> expression
      val while_: ?loc:loc -> ?attrs:attrs -> expression -> expression
---- ocaml-4.13/ast_mapper.ml
-+++ ocaml-4.13-extended/ast_mapper.ml
+@@@@
+     val unreachable: ?loc:loc -> ?attrs:attrs -> unit -> expression
+ 
+     val case: pattern -> ?guard:expression -> expression -> case
+     val binding_op: str -> pattern -> expression -> loc -> binding_op
+     val hole: ?loc:loc -> ?attrs:attrs -> unit -> expression
++    val beginend: ?loc:loc -> ?attrs:attrs -> expression -> expression
+   end
+ 
+ (** Value declarations *)
+ module Val:
+   sig
+--- parser-standard/ast_mapper.ml
++++ parser-extended/ast_mapper.ml
 @@@@
    value_description: mapper -> value_description -> value_description;
    with_constraint: mapper -> with_constraint -> with_constraint;
@@ -174,6 +198,18 @@
            (map_opt (sub.expr sub) e3)
      | Pexp_sequence (e1, e2) ->
          sequence ~loc ~attrs (sub.expr sub e1) (sub.expr sub e2)
+@@@@
+         letop ~loc ~attrs (sub.binding_op sub let_)
+           (List.map (sub.binding_op sub) ands) (sub.expr sub body)
+     | Pexp_extension x -> extension ~loc ~attrs (sub.extension sub x)
+     | Pexp_unreachable -> unreachable ~loc ~attrs ()
+     | Pexp_hole -> hole ~loc ~attrs ()
++    | Pexp_beginend e -> beginend ~loc ~attrs (sub.expr sub e)
+ 
+   let map_binding_op sub {pbop_op; pbop_pat; pbop_exp; pbop_loc} =
+     let open Exp in
+     let op = map_loc sub pbop_op in
+     let pat = sub.pat sub pbop_pat in
 @@@@
               (fun (vl, p) -> List.map (map_loc sub) vl, sub.pat sub p)
               p)
@@ -244,8 +280,8 @@
        and get_bool pexp =
          match pexp with
          | {pexp_desc = Pexp_construct ({txt = Longident.Lident "true"},
---- ocaml-4.13/ast_mapper.mli
-+++ ocaml-4.13-extended/ast_mapper.mli
+--- parser-standard/ast_mapper.mli
++++ parser-extended/ast_mapper.mli
 @@@@
    value_description: mapper -> value_description -> value_description;
    with_constraint: mapper -> with_constraint -> with_constraint;
@@ -258,8 +294,8 @@
      using an open recursion style: each method takes as its first
      argument the mapper to be applied to children in the syntax
      tree. *)
---- ocaml-4.13/asttypes.mli
-+++ ocaml-4.13-extended/asttypes.mli
+--- parser-standard/asttypes.mli
++++ parser-extended/asttypes.mli
 @@@@
  
  type override_flag = Override | Fresh
@@ -272,9 +308,9 @@
  
  type arg_label =
      Nolabel
-   | Labelled of string (*  label:T -> ... *)
---- ocaml-4.13/docstrings.ml
-+++ ocaml-4.13-extended/docstrings.ml
+   | Labelled of string (** [label:T -> ...] *)
+--- parser-standard/docstrings.ml
++++ parser-extended/docstrings.ml
 @@@@
  
  let docs_attr ds =
@@ -305,8 +341,8 @@
        pexp_attributes = []; }
    in
    let item =
---- ocaml-4.13/parser.mly
-+++ ocaml-4.13-extended/parser.mly
+--- parser-standard/parser.mly
++++ parser-extended/parser.mly
 @@@@
  let mksig ~loc d = Sig.mk ~loc:(make_loc loc) d
  let mkmod ~loc ?attrs d = Mod.mk ~loc:(make_loc loc) ?attrs d
@@ -424,6 +460,21 @@
    tail = listx(delimiter, X, Y)
      { let xs, y = tail in
 @@@@
+       mkexp_attrs ~loc:$sloc desc attrs }
+   | mkexp(simple_expr_)
+       { $1 }
+ ;
+ %inline simple_expr_attrs:
+-  | BEGIN ext = ext attrs = attributes e = seq_expr END
+-      { e.pexp_desc, (ext, attrs @ e.pexp_attributes) }
++  | BEGIN ext_attributes seq_expr END
++      { Pexp_beginend $3, $2 }
+   | BEGIN ext_attributes END
+       { Pexp_construct (mkloc (Lident "()") (make_loc $sloc), None), $2 }
+   | BEGIN ext_attributes seq_expr error
+       { unclosed "begin" $loc($1) "end" $loc($4) }
+   | NEW ext_attributes mkrhs(class_longident)
+@@@@
          Pexp_open(od, mkexp ~loc:($startpos($3), $endpos) (Pexp_array [])) }
    | mod_longident DOT
      LBRACKETBAR expr_semi_list error
@@ -509,8 +560,8 @@
  /* Identifiers and long identifiers */
  
  ident:
---- ocaml-4.13/parsetree.mli
-+++ ocaml-4.13-extended/parsetree.mli
+--- parser-standard/parsetree.mli
++++ parser-extended/parsetree.mli
 @@@@
  
  *)
@@ -519,11 +570,11 @@
  
 -type constant =
 +type constant_desc =
-     Pconst_integer of string * char option
-   (* 3 3l 3L 3n
+   | Pconst_integer of string * char option
+       (** Integer constants such as [3] [3l] [3L] [3n].
  
-      Suffixes [g-z][G-Z] are accepted by the parser.
-      Suffixes except 'l', 'L' and 'n' are rejected by the typechecker
+      Suffixes [[g-z][G-Z]] are accepted by the parser.
+      Suffixes except ['l'], ['L'] and ['n'] are rejected by the typechecker
 @@@@
  
       Suffixes [g-z][G-Z] are accepted by the parser.
@@ -541,40 +592,52 @@
  
  type attribute = {
 @@@@
-          *)
    | Ppat_variant of label * pattern option
-         (* `A             (None)
-            `A P           (Some P)
+       (** [Ppat_variant(`A, pat)] represents:
+             - [`A]   when [pat] is [None],
+             - [`A P] when [pat] is [Some P]
           *)
 -  | Ppat_record of (Longident.t loc * pattern) list * closed_flag
 +  | Ppat_record of (Longident.t loc * pattern) list * closed_flag_loc
-         (* { l1=P1; ...; ln=Pn }     (flag = Closed)
-            { l1=P1; ...; ln=Pn; _}   (flag = Open)
+       (** [Ppat_record([(l1, P1) ; ... ; (ln, Pn)], flag)] represents:
+             - [{ l1=P1; ...; ln=Pn }]
+                  when [flag] is {{!Asttypes.closed_flag.Closed}[Closed]}
+             - [{ l1=P1; ...; ln=Pn; _}]
+                  when [flag] is {{!Asttypes.closed_flag.Open}[Open]}
  
-            Invariant: n > 0
+            Invariant: [n > 0]
           *)
-   | Ppat_array of pattern list
-         (* [| P1; ...; Pn |] *)
-+  | Ppat_list of pattern list
-+        (* [ P1; ...; Pn ] *)
-   | Ppat_or of pattern * pattern
-         (* P1 | P2 *)
-   | Ppat_constraint of pattern * core_type
-         (* (P : T) *)
-   | Ppat_type of Longident.t loc
+   | Ppat_array of pattern list  (** Pattern [[| P1; ...; Pn |]] *)
++  | Ppat_list of pattern list  (** Pattern [[ P1; ...; Pn ]] *)
+   | Ppat_or of pattern * pattern  (** Pattern [P1 | P2] *)
+   | Ppat_constraint of pattern * core_type  (** Pattern [(P : T)] *)
+   | Ppat_type of Longident.t loc  (** Pattern [#tconst] *)
+   | Ppat_lazy of pattern  (** Pattern [lazy P] *)
+   | Ppat_unpack of string option loc
 @@@@
-         (* E.l *)
+          *)
+   | Pexp_field of expression * Longident.t loc  (** [E.l] *)
    | Pexp_setfield of expression * Longident.t loc * expression
-         (* E1.l <- E2 *)
-   | Pexp_array of expression list
-         (* [| E1; ...; En |] *)
-+  | Pexp_list of expression list
-+        (* [ E1; ...; En ] *)
+       (** [E1.l <- E2] *)
+   | Pexp_array of expression list  (** [[| E1; ...; En |]] *)
++  | Pexp_list of expression list  (** [[ E1; ...; En ]] *)
    | Pexp_ifthenelse of expression * expression * expression option
-         (* if E1 then E2 else E3 *)
-   | Pexp_sequence of expression * expression
-         (* E1; E2 *)
-   | Pexp_while of expression * expression
+       (** [if E1 then E2 else E3] *)
+   | Pexp_sequence of expression * expression  (** [E1; E2] *)
+   | Pexp_while of expression * expression  (** [while E1 do E2 done] *)
+   | Pexp_for of pattern * expression * expression * direction_flag * expression
+@@@@
+       (** - [let* P = E0 in E1]
+             - [let* P0 = E00 and* P1 = E01 in E1] *)
+   | Pexp_extension of extension  (** [[%id]] *)
+   | Pexp_unreachable  (** [.] *)
+   | Pexp_hole  (** [_] *)
++  | Pexp_beginend of expression  (** [begin E end] *)
+ 
+ and case =
+     {
+      pc_lhs: pattern;
+      pc_guard: expression option;
 @@@@
  and directive_argument_desc =
    | Pdir_string of string
@@ -587,13 +650,13 @@
 +    prepl_phrase : toplevel_phrase;
 +    prepl_output : string;
 +  }
---- ocaml-4.13/printast.ml
-+++ ocaml-4.13-extended/printast.ml
+--- parser-standard/printast.ml
++++ parser-extended/printast.ml
 @@@@
+   if l.pos_lnum = -1
    then fprintf f "%s[%d]" fname l.pos_cnum
    else fprintf f "%s[%d,%d+%d]" fname l.pos_lnum l.pos_bol
                 (l.pos_cnum - l.pos_bol)
- ;;
  
 +let curr_indent : int ref = ref 0
 +
@@ -601,7 +664,6 @@
 +  curr_indent := i;
 +  fprintf f "%s" (String.make ((2*i) mod 72) ' ');
 +  fprintf f s (*...*)
-+;;
 +
 +type cmts =
 +  { before: Location.t -> string list option
@@ -640,10 +702,10 @@
 +            fmt_cmts i f "within" w;
 +            fmt_cmts i f " after" a )
    end
- ;;
  
  let rec fmt_longident_aux f x =
    match x with
+   | Longident.Lident (s) -> fprintf f "%s" s
 @@@@
  
  let fmt_char_option f = function
@@ -652,31 +714,31 @@
  
 -let fmt_constant f x =
 -  match x with
--  | Pconst_integer (i,m) -> fprintf f "PConst_int (%s,%a)" i fmt_char_option m;
--  | Pconst_char (c) -> fprintf f "PConst_char %02x" (Char.code c);
+-  | Pconst_integer (i,m) -> fprintf f "PConst_int (%s,%a)" i fmt_char_option m
+-  | Pconst_char (c) -> fprintf f "PConst_char %02x" (Char.code c)
 +let fmt_constant i f x =
 +  line i f "constant %a\n" fmt_location x.pconst_loc;
 +  let i = i+1 in
 +  match x.pconst_desc with
-+  | Pconst_integer (j,m) -> line i f "PConst_int (%s,%a)" j fmt_char_option m;
-+  | Pconst_char (c) -> line i f "PConst_char %02x" (Char.code c);
++  | Pconst_integer (j,m) -> line i f "PConst_int (%s,%a)" j fmt_char_option m
++  | Pconst_char (c) -> line i f "PConst_char %02x" (Char.code c)
    | Pconst_string (s, strloc, None) ->
--      fprintf f "PConst_string(%S,%a,None)" s fmt_location strloc ;
-+      line i f "PConst_string(%S,%a,None)" s fmt_location strloc ;
+-      fprintf f "PConst_string(%S,%a,None)" s fmt_location strloc
++      line i f "PConst_string(%S,%a,None)" s fmt_location strloc
    | Pconst_string (s, strloc, Some delim) ->
--      fprintf f "PConst_string (%S,%a,Some %S)" s fmt_location strloc delim;
--  | Pconst_float (s,m) -> fprintf f "PConst_float (%s,%a)" s fmt_char_option m;
-+      line i f "PConst_string (%S,%a,Some %S)" s fmt_location strloc delim;
-+  | Pconst_float (s,m) -> line i f "PConst_float (%s,%a)" s fmt_char_option m;
- ;;
+-      fprintf f "PConst_string (%S,%a,Some %S)" s fmt_location strloc delim
+-  | Pconst_float (s,m) -> fprintf f "PConst_float (%s,%a)" s fmt_char_option m
++      line i f "PConst_string (%S,%a,Some %S)" s fmt_location strloc delim
++  | Pconst_float (s,m) -> line i f "PConst_float (%s,%a)" s fmt_char_option m
  
  let fmt_mutable_flag f x =
    match x with
-   | Immutable -> fprintf f "Immutable";
+   | Immutable -> fprintf f "Immutable"
+   | Mutable -> fprintf f "Mutable"
 @@@@
-   | Override -> fprintf f "Override";
-   | Fresh -> fprintf f "Fresh";
- ;;
+   match x with
+   | Override -> fprintf f "Override"
+   | Fresh -> fprintf f "Fresh"
  
  let fmt_closed_flag f x =
 -  match x with
@@ -691,29 +753,35 @@
 +
  let fmt_rec_flag f x =
    match x with
-   | Nonrecursive -> fprintf f "Nonrec";
-   | Recursive -> fprintf f "Rec";
- ;;
+   | Nonrecursive -> fprintf f "Nonrec"
+   | Recursive -> fprintf f "Rec"
+ 
 @@@@
+ let fmt_private_flag f x =
    match x with
-   | Public -> fprintf f "Public";
-   | Private -> fprintf f "Private";
- ;;
+   | Public -> fprintf f "Public"
+   | Private -> fprintf f "Private"
  
 -let line i f s (*...*) =
 -  fprintf f "%s" (String.make ((2*i) mod 72) ' ');
 -  fprintf f s (*...*)
--;;
 -
  let list i f ppf l =
    match l with
-   | [] -> line i ppf "[]\n";
+   | [] -> line i ppf "[]\n"
    | _ :: _ ->
       line i ppf "[\n";
 @@@@
+       f (i+1) ppf x
+ 
+ let longident_loc i ppf li = line i ppf "%a\n" fmt_longident_loc li
+ let string i ppf s = line i ppf "\"%s\"\n" s
+ let string_loc i ppf s = line i ppf "%a\n" fmt_string_loc s
+-let str_opt_loc i ppf s = line i ppf "%a\n" fmt_str_opt_loc s
+ let arg_label i ppf = function
+   | Nolabel -> line i ppf "Nolabel\n"
    | Optional s -> line i ppf "Optional \"%s\"\n" s
    | Labelled s -> line i ppf "Labelled \"%s\"\n" s
- ;;
  
  let typevars ppf vs =
 -  List.iter (fun x -> fprintf ppf " %a" Pprintast.tyvar x.txt) vs
@@ -902,6 +970,14 @@
        line i ppf "Pexp_unreachable"
    | Pexp_hole ->
        line i ppf "Pexp_hole"
++  | Pexp_beginend e ->
++      line i ppf "Pexp_beginend\n";
++      expression i ppf e
+ 
+ and value_description i ppf x =
+   line i ppf "value_description %a %a\n" fmt_string_loc
+        x.pval_name fmt_location x.pval_loc;
+   attributes i ppf x.pval_attributes;
 @@@@
    line i ppf "ptype_private = %a\n" fmt_private_flag x.ptype_private;
    line i ppf "ptype_manifest =\n";
@@ -1167,14 +1243,16 @@
 +  modtype_declaration (i+1) ppf x.pmtd_type
 +
  and module_declaration i ppf pmd =
-   str_opt_loc i ppf pmd.pmd_name;
-+  fmt_location ppf pmd.pmd_loc;
+-  str_opt_loc i ppf pmd.pmd_name;
++  line i ppf "module_declaration %a %a\n" fmt_str_opt_loc pmd.pmd_name
++    fmt_location pmd.pmd_loc;
    attributes i ppf pmd.pmd_attributes;
    module_type (i+1) ppf pmd.pmd_type;
  
  and module_binding i ppf x =
-   str_opt_loc i ppf x.pmb_name;
-+  fmt_location ppf x.pmb_loc;
+-  str_opt_loc i ppf x.pmb_name;
++  line i ppf "module_binding %a %a\n" fmt_str_opt_loc x.pmb_name
++    fmt_location x.pmb_loc;
    attributes i ppf x.pmb_attributes;
    module_expr (i+1) ppf x.pmb_expr
  
@@ -1242,7 +1320,6 @@
        line i ppf "Rinherit\n";
 -      core_type (i+1) ppf ct
 +      core_type i ppf ct
- ;;
  
  let rec toplevel_phrase i ppf x =
    match x with
@@ -1262,12 +1339,11 @@
 +  line i ppf "directive_argument %a\n" fmt_location x.pdira_loc;
 +  let i = i+1 in
    match x.pdira_desc with
-   | Pdir_string (s) -> line i ppf "Pdir_string \"%s\"\n" s;
-   | Pdir_int (n, None) -> line i ppf "Pdir_int %s\n" n;
-   | Pdir_int (n, Some m) -> line i ppf "Pdir_int %s%c\n" n m;
-   | Pdir_ident (li) -> line i ppf "Pdir_ident %a\n" fmt_longident li;
-   | Pdir_bool (b) -> line i ppf "Pdir_bool %s\n" (string_of_bool b);
- ;;
+   | Pdir_string (s) -> line i ppf "Pdir_string \"%s\"\n" s
+   | Pdir_int (n, None) -> line i ppf "Pdir_int %s\n" n
+   | Pdir_int (n, Some m) -> line i ppf "Pdir_int %s%c\n" n m
+   | Pdir_ident (li) -> line i ppf "Pdir_ident %a\n" fmt_longident li
+   | Pdir_bool (b) -> line i ppf "Pdir_bool %s\n" (string_of_bool b)
  
 +let repl_phrase i ppf x =
 +  line i ppf "repl_phrase\n";
@@ -1275,28 +1351,70 @@
 +  toplevel_phrase i ppf x.prepl_phrase;
 +  line i ppf "output %S\n" x.prepl_output
 +
- let interface ppf x = list 0 signature_item ppf x;;
+ let interface ppf x = list 0 signature_item ppf x
  
- let implementation ppf x = list 0 structure_item ppf x;;
+ let implementation ppf x = list 0 structure_item ppf x
  
- let top_phrase ppf x = toplevel_phrase 0 ppf x;;
+ let top_phrase ppf x = toplevel_phrase 0 ppf x
 +
-+let repl_phrase ppf x = repl_phrase 0 ppf x;;
---- ocaml-4.13/printast.mli
-+++ ocaml-4.13-extended/printast.mli
++let repl_phrase ppf x = repl_phrase 0 ppf x
++
++let expression ppf x = expression 0 ppf x
++
++let payload ppf x = payload 0 ppf x
++
++let core_type ppf x = core_type 0 ppf x
++
++let module_type ppf x = module_type 0 ppf x
++
++let pattern ppf x = pattern 0 ppf x
++
++let type_declaration ppf x = type_declaration 0 ppf x
++
++let value_binding ppf x = value_binding 0 ppf x
++
++let class_expr ppf x = class_expr 0 ppf x
++
++let class_type ppf x = class_type 0 ppf x
++
++let class_field ppf x = class_field 0 ppf x
++
++let class_type_field ppf x = class_type_field 0 ppf x
++
++let module_expr ppf x = module_expr 0 ppf x
++
++let structure_item ppf x = structure_item 0 ppf x
++
++let signature_item ppf x = signature_item 0 ppf x
+--- parser-standard/printast.mli
++++ parser-extended/printast.mli
 @@@@
- open Format;;
+ open Format
  
- val interface : formatter -> signature_item list -> unit;;
- val implementation : formatter -> structure_item list -> unit;;
- val top_phrase : formatter -> toplevel_phrase -> unit;;
-+val repl_phrase : formatter -> repl_phrase -> unit;;
+ val interface : formatter -> signature_item list -> unit
+ val implementation : formatter -> structure_item list -> unit
+ val top_phrase : formatter -> toplevel_phrase -> unit
++val repl_phrase : formatter -> repl_phrase -> unit
  
- val expression: int -> formatter -> expression -> unit
+-val expression: int -> formatter -> expression -> unit
++val expression: formatter -> expression -> unit
  val structure: int -> formatter -> structure -> unit
- val payload: int -> formatter -> payload -> unit
-+val core_type: int -> formatter -> core_type -> unit
-+val module_type: int -> formatter -> module_type -> unit
+-val payload: int -> formatter -> payload -> unit
+-val core_type: int -> formatter -> core_type -> unit
+-val module_type: int -> formatter -> module_type -> unit
++val payload: formatter -> payload -> unit
++val core_type: formatter -> core_type -> unit
++val module_type: formatter -> module_type -> unit
++val pattern: formatter -> pattern -> unit
++val type_declaration: formatter -> type_declaration -> unit
++val value_binding: formatter -> value_binding -> unit
++val class_expr: formatter -> class_expr -> unit
++val class_type: formatter -> class_type -> unit
++val class_field: formatter -> class_field -> unit
++val class_type_field: formatter -> class_type_field -> unit
++val module_expr: formatter -> module_expr -> unit
++val structure_item: formatter -> structure_item -> unit
++val signature_item: formatter -> signature_item -> unit
 +
 +type cmts =
 +  { before: Location.t -> string list option
@@ -1304,102 +1422,3 @@
 +  ; after: Location.t -> string list option }
 +
 +val cmts : cmts option ref
---- ocaml-4.13/pprintast.ml
-+++ ocaml-4.13-extended/pprintast.ml
-@@@@
-   | Lapply (y,s) ->
-       pp f "%a(%a)" longident y longident s
- 
- let longident_loc f x = pp f "%a" longident x.txt
- 
--let constant f = function
-+let constant f x =
-+  match x.pconst_desc with
-   | Pconst_char i ->
-       pp f "%C"  i
-   | Pconst_string (i, _, None) ->
-       pp f "%S" i
-   | Pconst_string (i, _, Some delim) ->
-@@@@
-             pp f "@[<hov2>%s: %a@ %a@ @]" l.txt
-               (core_type ctxt) ct (attributes ctxt) x.pof_attributes
-           | Oinherit ct ->
-             pp f "@[<hov2>%a@ @]" (core_type ctxt) ct
-         in
--        let field_var f = function
-+        let field_var f : Asttypes.closed_flag -> unit = function
-           | Asttypes.Closed -> ()
-           | Asttypes.Open ->
-               match l with
-               | [] -> pp f ".."
-               | _ -> pp f " ;.."
-@@@@
-         pp f  "%s" x
-     | Ppat_any -> pp f "_";
-     | Ppat_var ({txt = txt;_}) -> protect_ident f txt
-     | Ppat_array l ->
-         pp f "@[<2>[|%a|]@]"  (list (pattern1 ctxt) ~sep:";") l
-+    | Ppat_list l ->
-+        pp f "@[<2>[%a]@]"  (list (pattern1 ctxt) ~sep:";") l
-     | Ppat_unpack { txt = None } ->
-         pp f "(module@ _)@ "
-     | Ppat_unpack { txt = Some s } ->
-         pp f "(module@ %s)@ " s
-     | Ppat_type li ->
-@@@@
-         pp f "@[<2>exception@;%a@]" (pattern1 ctxt) p
-     | Ppat_extension e -> extension ctxt f e
-     | Ppat_open (lid, p) ->
-         let with_paren =
-         match p.ppat_desc with
--        | Ppat_array _ | Ppat_record _
-+        | Ppat_array _ | Ppat_list _ | Ppat_record _
-         | Ppat_construct (({txt=Lident ("()"|"[]");_}), None) -> false
-         | _ -> true in
-         pp f "@[<2>%a.%a @]" longident_loc lid
-           (paren with_paren @@ pattern1 ctxt) p
-     | _ -> paren true (pattern ctxt) f x
-@@@@
-           (option ~last:" with@;" (simple_expr ctxt)) eo
-           (list longident_x_expression ~sep:";@;") l
-     | Pexp_array (l) ->
-         pp f "@[<0>@[<2>[|%a|]@]@]"
-           (list (simple_expr (under_semi ctxt)) ~sep:";") l
-+    | Pexp_list (l) ->
-+        pp f "@[<0>@[<2>[%a]@]@]"
-+          (list (simple_expr (under_semi ctxt)) ~sep:";") l
-     | Pexp_while (e1, e2) ->
-         let fmt : (_,_,_) format = "@[<2>while@;%a@;do@;%a@;done@]" in
-         pp f fmt (expression ctxt) e1 (expression ctxt) e2
-     | Pexp_for (s, e1, e2, df, e3) ->
-         let fmt:(_,_,_)format =
-@@@@
-   pp_print_newline f ();
-   toplevel_phrase f x;
-   pp f ";;";
-   pp_print_newline f ()
- 
-+let repl_phrase f x =
-+  top_phrase f x.prepl_phrase;
-+  pp f "%s" x.prepl_output;
-+  pp_print_newline f ()
-+
- let core_type = core_type reset_ctxt
- let pattern = pattern reset_ctxt
- let signature = signature reset_ctxt
- let structure = structure reset_ctxt
- let module_expr = module_expr reset_ctxt
---- ocaml-4.13/pprintast.mli
-+++ ocaml-4.13-extended/pprintast.mli
-@@@@
- 
- val module_expr: Format.formatter -> Parsetree.module_expr -> unit
- 
- val toplevel_phrase : Format.formatter -> Parsetree.toplevel_phrase -> unit
- val top_phrase: Format.formatter -> Parsetree.toplevel_phrase -> unit
-+val repl_phrase: Format.formatter -> Parsetree.repl_phrase -> unit
- 
- val class_field: Format.formatter -> Parsetree.class_field -> unit
- val class_type_field: Format.formatter -> Parsetree.class_type_field -> unit
- val class_expr: Format.formatter -> Parsetree.class_expr -> unit
- val class_type: Format.formatter -> Parsetree.class_type -> unit

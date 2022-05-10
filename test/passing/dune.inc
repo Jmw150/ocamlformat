@@ -4217,6 +4217,24 @@
  (deps tests/.ocamlformat )
  (package ocamlformat)
  (action
+  (with-stdout-to qtest.ml.stdout
+   (with-stderr-to qtest.ml.stderr
+     (run %{bin:ocamlformat} --margin-check %{dep:tests/qtest.ml})))))
+
+(rule
+ (alias runtest)
+ (package ocamlformat)
+ (action (diff tests/qtest.ml qtest.ml.stdout)))
+
+(rule
+ (alias runtest)
+ (package ocamlformat)
+ (action (diff tests/qtest.ml.err qtest.ml.stderr)))
+
+(rule
+ (deps tests/.ocamlformat )
+ (package ocamlformat)
+ (action
   (with-stdout-to quoted_strings.ml.stdout
    (with-stderr-to quoted_strings.ml.stderr
      (run %{bin:ocamlformat} --margin-check %{dep:tests/quoted_strings.ml})))))
@@ -5022,6 +5040,42 @@
  (alias runtest)
  (package ocamlformat)
  (action (diff tests/use_file.mlt.err use_file.mlt.stderr)))
+
+(rule
+ (deps tests/.ocamlformat )
+ (package ocamlformat)
+ (action
+  (with-stdout-to verbatim_comments-wrap.ml.stdout
+   (with-stderr-to verbatim_comments-wrap.ml.stderr
+     (run %{bin:ocamlformat} --margin-check --wrap-comments %{dep:tests/verbatim_comments.ml})))))
+
+(rule
+ (alias runtest)
+ (package ocamlformat)
+ (action (diff tests/verbatim_comments-wrap.ml.ref verbatim_comments-wrap.ml.stdout)))
+
+(rule
+ (alias runtest)
+ (package ocamlformat)
+ (action (diff tests/verbatim_comments-wrap.ml.err verbatim_comments-wrap.ml.stderr)))
+
+(rule
+ (deps tests/.ocamlformat )
+ (package ocamlformat)
+ (action
+  (with-stdout-to verbatim_comments.ml.stdout
+   (with-stderr-to verbatim_comments.ml.stderr
+     (run %{bin:ocamlformat} --margin-check %{dep:tests/verbatim_comments.ml})))))
+
+(rule
+ (alias runtest)
+ (package ocamlformat)
+ (action (diff tests/verbatim_comments.ml.ref verbatim_comments.ml.stdout)))
+
+(rule
+ (alias runtest)
+ (package ocamlformat)
+ (action (diff tests/verbatim_comments.ml.err verbatim_comments.ml.stderr)))
 
 (rule
  (deps tests/.ocamlformat )

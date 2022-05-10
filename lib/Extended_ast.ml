@@ -9,7 +9,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Ocaml_413_extended
+open Parser_extended
 include Parsetree
 
 let equal_core_type : core_type -> core_type -> bool = Poly.equal
@@ -105,10 +105,24 @@ module Parse = struct
     in
     Ast_mapper.{default_mapper with expr; pat}
 
-  let normalize fg x = map fg fix_letop_locs @@ map fg normalize_lists @@ x
+  let remove_beginend_nodes =
+    let expr (m : Ast_mapper.mapper) e =
+      let e' =
+        match e with
+        | {pexp_desc= Pexp_beginend e'; pexp_attributes= []; _} -> e'
+        | _ -> e
+      in
+      Ast_mapper.default_mapper.expr m e'
+    in
+    Ast_mapper.{default_mapper with expr}
 
-  let ast (type a) (fg : a t) lexbuf : a =
-    normalize fg
+  let normalize fg ~preserve_beginend x =
+    map fg fix_letop_locs @@ map fg normalize_lists
+    @@ (if preserve_beginend then Fn.id else map fg remove_beginend_nodes)
+    @@ x
+
+  let ast (type a) (fg : a t) ~preserve_beginend lexbuf : a =
+    normalize fg ~preserve_beginend
     @@
     match fg with
     | Structure -> Parse.implementation lexbuf
@@ -118,23 +132,6 @@ module Parse = struct
     | Module_type -> Parse.module_type lexbuf
     | Expression -> Parse.expression lexbuf
     | Repl_file -> Toplevel_lexer.repl_file lexbuf
-end
-
-module Pprintast = struct
-  include Pprintast
-
-  let use_file = Format.pp_print_list top_phrase
-
-  let repl_file = Format.pp_print_list repl_phrase
-
-  let ast (type a) : a t -> _ -> a -> _ = function
-    | Structure -> structure
-    | Signature -> signature
-    | Use_file -> use_file
-    | Core_type -> core_type
-    | Module_type -> module_type
-    | Expression -> expression
-    | Repl_file -> repl_file
 end
 
 module Printast = struct
@@ -148,9 +145,9 @@ module Printast = struct
     | Structure -> implementation
     | Signature -> interface
     | Use_file -> use_file
-    | Core_type -> core_type 0
-    | Module_type -> module_type 0
-    | Expression -> expression 0
+    | Core_type -> core_type
+    | Module_type -> module_type
+    | Expression -> expression
     | Repl_file -> repl_file
 end
 

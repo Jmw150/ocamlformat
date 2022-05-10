@@ -9,7 +9,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Ocaml_413_extended
+open Parser_extended
 
 include module type of Parsetree
 
@@ -27,7 +27,7 @@ type 'a t =
   | Repl_file : repl_file t
 
 module Parse : sig
-  val ast : 'a t -> Lexing.lexbuf -> 'a
+  val ast : 'a t -> preserve_beginend:bool -> Lexing.lexbuf -> 'a
 end
 
 val equal_core_type : core_type -> core_type -> bool
@@ -36,13 +36,9 @@ val equal : 'a t -> 'a -> 'a -> bool
 
 val map : 'a t -> Ast_mapper.mapper -> 'a -> 'a
 
-module Pprintast : sig
-  include module type of Pprintast
-
-  val ast : 'a t -> Format.formatter -> 'a -> unit
-end
-
 module Printast : sig
+  include module type of Printast
+
   val ast : 'a t -> Format.formatter -> 'a -> unit
 end
 
